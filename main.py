@@ -15,7 +15,10 @@ from args import argument_parser, dataset_kwargs, optimizer_kwargs, lr_scheduler
 from src import models
 from src.data_manager import ImageDataManager
 from src.eval_metrics import evaluate
-from src.losses import CrossEntropyLoss, TripletLoss, DeepSupervision
+from src.losses import CrossEntropyLoss, TripletLoss, DeepSupervision, CenterLoss # CircleLoss, convert_label_to_similarity
+
+from src.custom_losses import ArcLoss, ArcFaceLoss
+# from src.custom_models import ResNet
 from src.lr_schedulers import init_lr_scheduler
 from src.optimizers import init_optimizer
 from src.utils.avgmeter import AverageMeter
@@ -45,7 +48,12 @@ def main():
     use_gpu = torch.cuda.is_available()
     if args.use_cpu:
         use_gpu = False
-    log_name = "log_test.txt" if args.evaluate else "log_train.txt"
+
+
+    now = datetime.datetime.now()
+
+    log_name = f"log_test_{now.strftime('%A, %B %d, %Y %I:%M %p')}.txt" if args.evaluate else f"log_train_{now.strftime('%A, %B %d, %Y %I:%M %p')}.txt"
+
     sys.stdout = Logger(osp.join(args.save_dir, log_name))
     print(f"==========\nArgs:{args}\n==========")
 
@@ -68,16 +76,20 @@ def main():
         use_gpu=use_gpu,
     )
     print("Model size: {:.3f} M".format(count_num_param(model)))
-
     if args.load_weights and check_isfile(args.load_weights):
         load_pretrained_weights(model, args.load_weights)
 
     model = nn.DataParallel(model).cuda() if use_gpu else model
-
+    # model
     criterion_xent = CrossEntropyLoss(
         num_classes=dm.num_train_pids, use_gpu=use_gpu, label_smooth=args.label_smooth
     )
     criterion_htri = TripletLoss(margin=args.margin)
+    # criterion_htri = CrossEntropyLoss(num_classes=576)
+    # criterion_htri = CenterLoss(num_classes=dm.num_train_pids, feat_dim=2048)
+    # criterion_htri = ArcLoss() #this worked
+    # criterion_htri = ArcFaceLoss(num_classes=576, embedding_size=512, margin=0.5, scale=32) 
+    # CenterLoss(num_classes=576, feat_dim=128) #CircleLoss(m=0.25, gamma=256) #CenterLoss(576, 512) #CenterLoss(feat_dim=512) #nn.CrossEntropyLoss() #ArcLoss()
     optimizer = init_optimizer(model, **optimizer_kwargs(args))
     scheduler = init_lr_scheduler(optimizer, **lr_scheduler_kwargs(args))
 
@@ -85,6 +97,7 @@ def main():
         args.start_epoch = resume_from_checkpoint(
             args.resume, model, optimizer=optimizer
         )
+        
 
     if args.evaluate:
         print("Evaluate only")
@@ -240,18 +253,20 @@ def test(
     batch_time = AverageMeter()
 
     model.eval()
-
+    # print(model)
     with torch.no_grad():
         qf, q_pids, q_camids = [], [], []
         for batch_idx, (imgs, pids, camids, _) in enumerate(queryloader):
             if use_gpu:
                 imgs = imgs.cuda()
 
-            end = time.time()
+            end = time.time() 
             features = model(imgs)
             batch_time.update(time.time() - end)
 
             features = features.data.cpu()
+            # print("features--------->", features.shape)
+
             qf.append(features)
             q_pids.extend(pids)
             q_camids.extend(camids)
@@ -293,12 +308,24 @@ def test(
     )
 
     m, n = qf.size(0), gf.size(0)
+    # Euclidean distance
     distmat = (
         torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n)
         + torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
     )
     distmat.addmm_(qf, gf.t(), beta=1, alpha=-2)
     distmat = distmat.numpy()
+
+    # # Cosine
+    # # qf_norm = qf / qf.norm(dim=1, keepdim=True)
+    # # gf_norm = gf / gf.norm(dim=1, keepdim=True)
+    # # distmat = torch.mm(qf_norm, gf_norm.t()).numpy()
+
+    # import torch.nn.functional as F
+    # qf_norm = F.normalize(qf, p=1, dim=1)
+    # gf_norm = F.normalize(gf, p=1, dim=1)
+    # distmat = 1 - torch.mm(qf_norm, gf_norm.t()).numpy()
+
 
     print("Computing CMC and mAP")
     # cmc, mAP = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, args.target_names)

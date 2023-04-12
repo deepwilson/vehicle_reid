@@ -5,6 +5,7 @@ import torch.utils.model_zoo as model_zoo
 import torchvision
 from torch import nn
 from torch.nn import functional as F
+from src.custom_models import Modified_Head
 
 __all__ = ["resnet50", "resnet50_fc512"]
 
@@ -97,7 +98,29 @@ class Bottleneck(nn.Module):
 
         return out
 
+# for centerloss
+def weights_init_kaiming(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.kaiming_normal_(m.weight, a=0, model='fan_out')
+        nn.init.constant_(m.bias, 0.0)
 
+    elif classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight, a=0, model='fan_in')
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
+    elif classname.find('BatchNorm') != -1:
+        if m.affine:
+            nn.init.constant_(m.weight, 1.0)
+            nn.init.constant_(m.bias, 0.0)
+
+
+def weights_init_classifier(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.normal_(m.weight, std=0.001)
+        if m.bias:
+            nn.init.constant_(m.bias, 0.0)
 class ResNet(nn.Module):
     """
     Residual network
@@ -135,6 +158,21 @@ class ResNet(nn.Module):
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = self._construct_fc_layer(fc_dims, 512 * block.expansion, dropout_p)
         self.classifier = nn.Linear(self.feature_dim, num_classes)
+
+        #for arcface
+        # self.fc1 = nn.Linear(2048,512) 
+        # self.bn1_a = nn.BatchNorm2d(2048)
+        # self.bn2_a = nn.BatchNorm1d(512)
+        # self.dropout = nn.Dropout2d(0.5, inplace=True)
+
+        #for centerloss
+        # self.bottleneck = nn.BatchNorm1d(2048)
+        # self.bottleneck.bias.requires_grad_(False)
+        # self.bottleneck.apply(weights_init_kaiming)
+
+        self.head = Modified_Head(backbone_output_size=2048, bottle_neck=512, exclude_classifier=True)
+
+
 
         self._init_params()
 
@@ -234,6 +272,51 @@ class ResNet(nn.Module):
             return y
         elif self.loss == {"xent", "htri"}:
             return y, v
+        else:
+            raise KeyError(f"Unsupported loss: {self.loss}")
+        
+
+
+        f = self.featuremaps(x)
+        #centerloss
+        # global_feat = F.avg_pool2d(f, f.shape[2:4])
+        # global_feat = global_feat.view(global_feat.shape[0], -1)  # flatten to (bs, 2048)
+        # feat = self.bottleneck(global_feat)
+
+        v = self.global_avgpool(f) #torch.Size([64, 2048, 1, 1])
+        # out = self.global_avgpool(f) #torch.Size([64, 2048, 1, 1])
+        # print("v.shape---------->", v.shape)
+
+        v = v.view(v.size(0), -1) #torch.Size([64, 2048])
+        #arc_loss
+        features = self.head(v)
+        if self.fc is not None:
+            v = self.fc(v) #for triplet loss
+
+        if not self.training:
+            return features
+            return v
+
+        y = self.classifier(v)
+
+        #arcface
+        # features = self.bn1_a(out)
+        # features = self.dropout(features)
+        # features = features.view(features.size(0), -1)
+        # features = self.fc1(features)
+        # features = self.bn2_a(features)
+
+        
+        #centerloss
+        # features = feat
+
+        if self.loss == {"xent"}:
+            return y
+        elif self.loss == {"xent", "htri"}:
+            # return y, v
+            return y, features
+        # elif self.loss == {"xent", "arcface"}:
+        #     return 
         else:
             raise KeyError(f"Unsupported loss: {self.loss}")
 

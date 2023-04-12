@@ -24,7 +24,8 @@ def save_checkpoint(state, save_dir, is_best=False, remove_module_from_keys=Fals
         state["state_dict"] = new_state_dict
     # save
     epoch = state["epoch"]
-    fpath = osp.join(save_dir, "model.pth.tar-" + str(epoch))
+    # fpath = osp.join(save_dir, "model.pth.tar-" + str(epoch))
+    fpath = osp.join(save_dir, "model.pth.tar") #save only latest to avoid memory issues
     torch.save(state, fpath)
     print(f'Checkpoint saved to "{fpath}"')
     if is_best:

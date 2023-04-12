@@ -2,6 +2,8 @@
 
 from .cross_entropy_loss import CrossEntropyLoss
 from .hard_mine_triplet_loss import TripletLoss
+from .center_loss import CenterLoss #CircleLoss, convert_label_to_similarity
+
 
 
 def DeepSupervision(criterion, xs, y):

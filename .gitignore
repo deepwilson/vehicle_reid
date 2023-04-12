@@ -1,3 +1,7 @@
 datasets/
 *.pyc
-
+#logs/resnet50-veri/*.pth.tar*
+logs/
+log/
+torch/
+pretrained_models/

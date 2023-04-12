@@ -1,12 +1,16 @@
 # Copyright (c) EEEM071, University of Surrey
 
 from .resnet import resnet50, resnet50_fc512
+from .seresnet import seresnet50
+
 
 
 __model_factory = {
     # image classification models
     "resnet50": resnet50,
+    "seresnet50": seresnet50,
     "resnet50_fc512": resnet50_fc512,
+
 }
 
 

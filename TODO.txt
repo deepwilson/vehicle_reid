@@ -1,0 +1,9 @@
+TODO
+[x] arcface 
+[ ] convert PIL to SIMD 
+[x] centerloss 
+[] save model every "n" epochs
+[] try adam optimizer and diff lr
+[] augmentations (rotation etc.)
+[] tensorboard setup
+[] 

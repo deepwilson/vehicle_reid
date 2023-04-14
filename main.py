@@ -192,6 +192,9 @@ def train(
         p.requires_grad = True  # open all layers
 
     end = time.time()
+
+    NUM_ACCUMULATION_STEPS = 3
+    total_loss = 0
     for batch_idx, (imgs, pids, _, _) in enumerate(trainloader):
         data_time.update(time.time() - end)
 
@@ -210,9 +213,23 @@ def train(
             htri_loss = criterion_htri(features, pids)
 
         loss = args.lambda_xent * xent_loss + args.lambda_htri * htri_loss
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            
+
+        if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS!=0) or ((batch_idx+1) == len(trainloader)):
+            total_loss += loss
+        if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS==0) or ((batch_idx+1) == len(trainloader)):
+            
+            # gradient accumalation
+            total_loss += loss
+            total_loss = total_loss / NUM_ACCUMULATION_STEPS
+
+            # Backward pass
+            loss.backward()
+            # parameters updated
+            optimizer.step()
+            # Reset gradient tensors
+            optimizer.zero_grad()
+            total_loss = 0
 
         batch_time.update(time.time() - end)
 

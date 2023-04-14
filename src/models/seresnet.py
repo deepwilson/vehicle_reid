@@ -1,5 +1,5 @@
 # https://github.com/Cadene/pretrained-models.pytorch/blob/master/pretrainedmodels/models/senet.py
-
+# source: https://www.kaggle.com/code/satian/seresnext101-pytorch-starter
 from collections import OrderedDict
 import math
 import torch.nn as nn

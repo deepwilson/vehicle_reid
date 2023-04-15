@@ -12,10 +12,12 @@ python3 main.py \
 --color-aug \
 --optim amsgrad \
 --lr 0.0001 \
---max-epoch 60 \
---stepsize 20 40 \
+--max-epoch 80 \
+--stepsize 20 40 60 \
 --train-batch-size 16 \
 --test-batch-size 100 \
 --eval-freq 5 \
---save-dir logs/seresnet_xent+triplet+3augmentations+gradaccumalation \
---resume "/user/HS400/da01075/coursework/CV/vehicle_reid/logs/seresnet_xent+triplet+3augmentations/model.pth.tar"
+--save-dir logs/seresnet_xent+triplet+3augmentations+gradaccumalation+1024embsize_BN_RELU_DROP+RandomIdentitySampler 
+
+# --resume "/user/HS400/da01075/coursework/CV/vehicle_reid/logs/seresnet_xent+triplet+3augmentations/model.pth.tar"
+# --train-sampler RandomIdentitySampler \

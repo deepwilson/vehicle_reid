@@ -23,10 +23,10 @@ class RandomIdentitySampler(Sampler):
         self.batch_size = batch_size
         self.num_instances = num_instances
         self.num_pids_per_batch = self.batch_size // self.num_instances
-        self.index_dic = defaultdict(list)
+        self.index_dic = defaultdict(list)  # Dictionary to store indices of samples for each unique identity
         for index, (_, pid, _) in enumerate(self.data_source):
             self.index_dic[pid].append(index)
-        self.pids = list(self.index_dic.keys())
+        self.pids = list(self.index_dic.keys())  # List of unique identities
 
         # estimate number of examples in an epoch
         self.length = 0
@@ -38,8 +38,9 @@ class RandomIdentitySampler(Sampler):
             self.length += num - num % self.num_instances
 
     def __iter__(self):
-        batch_idxs_dict = defaultdict(list)
+        batch_idxs_dict = defaultdict(list) # Dictionary to store sampled batch indices for each identity
 
+        # Randomly sample instances for each identity
         for pid in self.pids:
             idxs = copy.deepcopy(self.index_dic[pid])
             if len(idxs) < self.num_instances:
@@ -55,6 +56,7 @@ class RandomIdentitySampler(Sampler):
         avai_pids = copy.deepcopy(self.pids)
         final_idxs = []
 
+        # Randomly sample identities to form batches
         while len(avai_pids) >= self.num_pids_per_batch:
             selected_pids = random.sample(avai_pids, self.num_pids_per_batch)
             for pid in selected_pids:

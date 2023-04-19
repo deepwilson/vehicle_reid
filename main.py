@@ -7,6 +7,8 @@ import sys
 import time
 import warnings
 
+from torch.utils.tensorboard import SummaryWriter
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -38,6 +40,20 @@ from src.utils.visualtools import visualize_ranked_results
 parser = argument_parser()
 args = parser.parse_args()
 
+# save training script (train.sh) for future reruns
+import shutil
+import os
+def save_training_script(save_dir):
+    # Source file path
+    src_path = './train.sh'
+    filename = os.path.basename(src_path)
+    # Destination file path
+    dst_path = os.path.join(save_dir, filename)
+    # Copy the file
+    shutil.copy(src_path, dst_path)
+
+
+
 
 def main():
     global args
@@ -56,6 +72,11 @@ def main():
 
     sys.stdout = Logger(osp.join(args.save_dir, log_name))
     print(f"==========\nArgs:{args}\n==========")
+
+    save_training_script(args.save_dir)
+    print(f"==========training file saved to  {args.save_dir}==========")
+    
+    writer = SummaryWriter(log_dir=args.save_dir)
 
     if use_gpu:
         print(f"Currently using GPU {args.gpu_devices}")
@@ -142,10 +163,11 @@ def main():
             optimizer,
             trainloader,
             use_gpu,
+            writer
+            
         )
 
         scheduler.step()
-
         if (
             (epoch + 1) > args.start_eval
             and args.eval_freq > 0
@@ -179,14 +201,13 @@ def main():
 
 
 def train(
-    epoch, model, criterion_xent, criterion_htri, optimizer, trainloader, use_gpu
+    epoch, model, criterion_xent, criterion_htri, optimizer, trainloader, use_gpu, writer
 ):
     xent_losses = AverageMeter()
     htri_losses = AverageMeter()
     accs = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
-
     model.train()
     for p in model.parameters():
         p.requires_grad = True  # open all layers
@@ -213,23 +234,27 @@ def train(
             htri_loss = criterion_htri(features, pids)
 
         loss = args.lambda_xent * xent_loss + args.lambda_htri * htri_loss
-            
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-        if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS!=0) or ((batch_idx+1) == len(trainloader)):
-            total_loss += loss
-        if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS==0) or ((batch_idx+1) == len(trainloader)):
-            
-            # gradient accumalation
-            total_loss += loss
-            total_loss = total_loss / NUM_ACCUMULATION_STEPS
 
-            # Backward pass
-            loss.backward()
-            # parameters updated
-            optimizer.step()
-            # Reset gradient tensors
-            optimizer.zero_grad()
-            total_loss = 0
+        # if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS!=0) or ((batch_idx+1) == len(trainloader)):
+        #     total_loss += loss
+        # if ( (batch_idx+1) % NUM_ACCUMULATION_STEPS==0) or ((batch_idx+1) == len(trainloader)):
+            
+        #     # gradient accumalation
+        #     total_loss += loss
+        #     total_loss = total_loss / NUM_ACCUMULATION_STEPS
+
+        #     # Backward pass
+        #     loss.backward()
+        #     # parameters updated
+        #     optimizer.step()
+        #     # Reset gradient tensors
+        #     optimizer.zero_grad()
+        #     total_loss = 0
 
         batch_time.update(time.time() - end)
 
@@ -255,6 +280,13 @@ def train(
                     acc=accs,
                 )
             )
+
+        # Log to TensorBoard
+        iteration = epoch * len(trainloader) + batch_idx
+        writer.add_scalar('Train/Loss', loss.item(), iteration)
+        writer.add_scalar('Train/Xent_Loss', xent_loss.item(), iteration)
+        writer.add_scalar('Train/Htri_Loss', htri_loss.item(), iteration)
+        writer.add_scalar('Train/Accuracy', accs.avg, iteration)
 
         end = time.time()
 

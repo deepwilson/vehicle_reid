@@ -17,5 +17,5 @@ python3 main.py \
 --train-batch-size 16 \
 --test-batch-size 100 \
 --eval-freq 5 \
---save-dir logs/seresnet_xent+triplet+3augmentations+gradaccumalation \
+--save-dir logs/tensor \
 --resume "/user/HS400/da01075/coursework/CV/vehicle_reid/logs/seresnet_xent+triplet+3augmentations/model.pth.tar"

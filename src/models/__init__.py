@@ -2,6 +2,7 @@
 
 from .resnet import resnet50, resnet50_fc512
 from .seresnet import seresnet50
+from .seresnet18 import seresnet18
 
 
 
@@ -9,6 +10,7 @@ __model_factory = {
     # image classification models
     "resnet50": resnet50,
     "seresnet50": seresnet50,
+    "seresnet18": seresnet18,
     "resnet50_fc512": resnet50_fc512,
 
 }

@@ -7,6 +7,8 @@ import sys
 import time
 import warnings
 
+# from torch.utils.tensorboard import SummaryWriter
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -73,6 +75,9 @@ def main():
 
     save_training_script(args.save_dir)
     print(f"==========training file saved to  {args.save_dir}==========")
+    
+    # writer = SummaryWriter(log_dir=args.save_dir)
+
     if use_gpu:
         print(f"Currently using GPU {args.gpu_devices}")
         cudnn.benchmark = True
@@ -150,6 +155,7 @@ def main():
         optimizer.load_state_dict(initial_optim_state)
     """
     for epoch in range(args.start_epoch, args.max_epoch):
+        print(epoch)
         train(
             epoch,
             model,
@@ -157,7 +163,8 @@ def main():
             criterion_htri,
             optimizer,
             trainloader,
-            use_gpu,
+            use_gpu
+            
         )
 
         scheduler.step()
@@ -201,7 +208,7 @@ def train(
     accs = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
-
+    print("HERE")
     model.train()
     for p in model.parameters():
         p.requires_grad = True  # open all layers
@@ -210,7 +217,9 @@ def train(
 
     NUM_ACCUMULATION_STEPS = 3
     total_loss = 0
+    print("------------->", trainloader)
     for batch_idx, (imgs, pids, _, _) in enumerate(trainloader):
+        print("------------->", batch_idx)
         data_time.update(time.time() - end)
 
         if use_gpu:
@@ -274,6 +283,13 @@ def train(
                     acc=accs,
                 )
             )
+
+        # # Log to TensorBoard
+        # iteration = epoch * len(trainloader) + batch_idx
+        # writer.add_scalar('Train/Loss', loss.item(), iteration)
+        # writer.add_scalar('Train/Xent_Loss', xent_loss.item(), iteration)
+        # writer.add_scalar('Train/Htri_Loss', htri_loss.item(), iteration)
+        # writer.add_scalar('Train/Accuracy', accs.avg, iteration)
 
         end = time.time()
 

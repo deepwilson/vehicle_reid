@@ -297,8 +297,24 @@ class CustomSEResNeXt(nn.Module):
         self.model.load_state_dict(torch.load(weights_path))
         self.model.avg_pool = nn.AdaptiveAvgPool2d(1)
         # self.model.last_linear = nn.Linear(self.model.last_linear.in_features, 224)
-        self.model.last_linear = Identity()
-        self.model.classifier = nn.Linear(2048, num_classes)
+
+
+        """Last block custom"""
+        layers = []
+        dropout_p = None
+        hidden_dim = 512
+        layers.append(nn.Linear(2048, hidden_dim))
+        layers.append(nn.BatchNorm1d(hidden_dim))
+        layers.append(nn.ReLU(inplace=True))
+        if dropout_p is not None:
+            layers.append(nn.Dropout(p=dropout_p))
+        self.model.last_linear = nn.Sequential(*layers)
+
+        self.model.classifier = nn.Linear(hidden_dim, num_classes)
+
+
+        # self.model.last_linear = Identity()
+        # self.model.classifier = nn.Linear(2048, num_classes)
         
     def forward(self, x):
         v = self.model(x)
@@ -314,6 +330,6 @@ class CustomSEResNeXt(nn.Module):
         else:
             raise KeyError(f"Unsupported loss: {self.loss}")
         
-def seresnet50(num_classes, loss={"xent"}, **kwargs):
+def seresnext50(num_classes, loss={"xent"}, **kwargs):
     model = CustomSEResNeXt(loss, num_classes, **kwargs)
     return model

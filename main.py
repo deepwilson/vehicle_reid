@@ -57,6 +57,12 @@ def save_training_script(save_dir):
 
 def main():
     global args
+    if args.random_erase:
+        aug = "REA+CJ+FLIP"
+    else:
+        aug = "None"
+    experiment_name = f"Experiment_ARCH{args.arch}_OPT{args.optim}_SHEDULER{args.lr_scheduler}_BS_{args.train_batch_size}_AUG{aug}_SAMPLER{args.train_sampler}_HW{args.height}{args.width}"
+    args.save_dir = osp.join(args.save_dir, experiment_name)
 
     set_random_seed(args.seed)
     if not args.use_avai_gpus:
@@ -155,6 +161,8 @@ def main():
         optimizer.load_state_dict(initial_optim_state)
     """
     for epoch in range(args.start_epoch, args.max_epoch):
+        lr = scheduler.get_last_lr()[0]
+        # writer.add_hparams({'lr': lr, 'bsize': args.train_batch_size}, {})
         train(
             epoch,
             model,
@@ -168,6 +176,7 @@ def main():
         )
 
         scheduler.step()
+        
         if (
             (epoch + 1) > args.start_eval
             and args.eval_freq > 0
@@ -180,8 +189,10 @@ def main():
                 print(f"Evaluating {name} ...")
                 queryloader = testloader_dict[name]["query"]
                 galleryloader = testloader_dict[name]["gallery"]
-                rank1 = test(model, queryloader, galleryloader, use_gpu)
+                rank1, mAP = test(model, queryloader, galleryloader, use_gpu)
                 ranklogger.write(name, epoch + 1, rank1)
+                writer.add_scalar('Test/rank1', rank1, epoch+1)
+                writer.add_scalar('Test/mAP', mAP, epoch+1)
 
             save_checkpoint(
                 {
@@ -290,7 +301,7 @@ def train(
 
         end = time.time()
 
-
+    
 def test(
     model,
     queryloader,
@@ -389,7 +400,7 @@ def test(
 
     if return_distmat:
         return distmat
-    return cmc[0]
+    return cmc[0], mAP
 
 
 if __name__ == "__main__":
